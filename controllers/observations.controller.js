@@ -1,34 +1,54 @@
 const router = require('express').Router()
+const { v4: uuidv4 } = require('uuid');
+const { resource } = require('fhir-kit-client');
 
+const patientsData = require('../mock-data/patients.json')
+const observationsData = require('../mock-data/observations.json')
  
-router.get('/:number', async (req, res) => {
-
-    const auth = req.header('Authorization')
-    const response = await http.get(`/patient/number/${req.params.number}`, {
-      headers:{
-        'Authorization': `${auth}`
+// GET observations for a patient by NHS number or surname
+router.get('/', async (req, res) => {
+    try {
+     
+      const { nhsNumber, surname } = req.query;
+  
+      if (!nhsNumber && !surname) {
+        return res.status(400).json({ error: 'NHS number or Patient Surname is required' })
       }
-    })
-
-    let postcode = ''
-
-    if(response.data.addresses[0] != null){
-      postcode = response.data.addresses[0].postcode
-    }
-    
-    const patient = {
-      patientId: response.data.patientId,
-      patientNumber: response.data.patientNumber,
-      name: response.data.givenName + ' ' + response.data.familyName,
-      dob: response.data.birthDate,
-      postcode
+  
+      // Mock search for patient(s) based on NHS number or surname
+     
+    let patients;
+    if (nhsNumber) {
+      patients = patientsData.filter(patient => patient.identifier.value === nhsNumber)
+    } else {
+      patients = patientsData.filter(patient => patient.name[0].family.toLowerCase() === surname.toLowerCase())
     }
 
-    return res.status(200).send(patient)
+    if (patients.length === 0) {
+      return res.status(404).json({ error: 'No patient found' })
+    }
 
+    const patient = patients[0]
 
-});
+    const observations = observationsData.filter(observation => observation.subject.reference === `Patient/${patient.id}`)
+  
+      // Create FHIR Bundle resource
+      const bundle = new resource.Bundle({
+        id: uuidv4(),
+        type: 'searchset',
+        entry: [
+          { resource: patient },
+          ...observations.map((obs) => ({ resource: obs })),
+        ],
+      })
+  
+      res.json(bundle)
 
+    } catch (error) {
+      console.error('Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' })
+    }
+  });
 
 
 
