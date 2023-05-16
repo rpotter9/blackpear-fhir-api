@@ -1,6 +1,6 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid');
-const { resource } = require('fhir-kit-client');
+const Bundle = require('../models/Bundle');
 
 const patientsData = require('../mock-data/patients.json')
 const observationsData = require('../mock-data/observations.json')
@@ -33,14 +33,15 @@ router.get('/', async (req, res) => {
     const observations = observationsData.filter(observation => observation.subject.reference === `Patient/${patient.id}`)
   
       // Create FHIR Bundle resource
-      const bundle = new resource.Bundle({
-        id: uuidv4(),
-        type: 'searchset',
-        entry: [
+      const bundle = new Bundle(
+        uuidv4(),
+        'Bundle',
+        'searchset',
+        [
           { resource: patient },
           ...observations.map((obs) => ({ resource: obs })),
         ],
-      })
+      )
   
       res.json(bundle)
 
